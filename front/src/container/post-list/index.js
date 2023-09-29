@@ -1,6 +1,6 @@
 import "./index.css";
 
-import { useState, Fragment } from "react";
+import { useState, Fragment, useEffect, useReducer } from "react";
 
 import Title from "../../component/title";
 import Grid from "../../component/grid";
@@ -8,31 +8,41 @@ import Box from "../../component/box";
 
 import PostCreate from "../post-create";
 import PostItem from "../post-item";
-import { Alert, Skeleton, LOAD_STATUS } from "../../component/load";
+import { Alert, Skeleton } from "../../component/load";
 import { getDate } from "../../util/getDate";
 
+import {
+  requestInitialState,
+  requestReducer,
+  REQUEST_ACTION_TYPE,
+} from "../../util/request";
+
 export default function Container() {
-  const [status, setStatus] = useState(null);
-  const [message, setMessage] = useState("");
-  const [data, setData] = useState(null);
+  const [state, dispatch] = useReducer(requestReducer, requestInitialState);
 
   const getData = async () => {
-    setStatus(LOAD_STATUS.PROGRESS);
+    dispatch({ type: REQUEST_ACTION_TYPE.PROGRESS });
     try {
       const res = await fetch("http://localhost:4000/post-list");
 
       const data = await res.json();
 
       if (res.ok) {
-        setData(convertData(data));
-        setStatus(LOAD_STATUS.SUCCESS);
+        dispatch({
+          type: REQUEST_ACTION_TYPE.SUCCESS,
+          payload: convertData(data),
+        });
       } else {
-        setMessage(data.message);
-        setStatus(LOAD_STATUS.ERROR);
+        dispatch({
+          type: REQUEST_ACTION_TYPE.ERROR,
+          payload: data.message,
+        });
       }
     } catch (error) {
-      setMessage(error.message);
-      setStatus(LOAD_STATUS.ERROR);
+      dispatch({
+        type: REQUEST_ACTION_TYPE.ERROR,
+        payload: error.message,
+      });
     }
   };
 
@@ -43,15 +53,36 @@ export default function Container() {
       text,
       date: getDate(date),
     })),
+
     isEmpty: raw.list.length === 0,
   });
 
-  if (status === null) {
+  useEffect(() => {
     getData();
-  }
+  }, []);
+
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  // useWindowListener("pointermove", (e) => {
+  //   setPosition({ x: e.clientX, y: e.clientY });
+  // });
 
   return (
     <Grid>
+      {/* <div
+        style={{
+          position: "absolute",
+          backgroundColor: "pink",
+          borderRadius: "50%",
+          opacity: 0.6,
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          pointerEvents: "none",
+          left: -20,
+          top: -20,
+          width: 40,
+          height: 40,
+        }}
+      /> */}
       <Box>
         <Grid>
           <Title>Home</Title>
@@ -63,7 +94,7 @@ export default function Container() {
         </Grid>
       </Box>
 
-      {status === LOAD_STATUS.PROGRESS && (
+      {state.status === REQUEST_ACTION_TYPE.PROGRESS && (
         <Fragment>
           <Box>
             <Skeleton />
@@ -74,16 +105,16 @@ export default function Container() {
         </Fragment>
       )}
 
-      {status === LOAD_STATUS.ERROR && (
-        <Alert status={status} message={message} />
+      {state.status === REQUEST_ACTION_TYPE.ERROR && (
+        <Alert status={state.status} message={state.message} />
       )}
 
-      {status === LOAD_STATUS.SUCCESS && (
+      {state.status === REQUEST_ACTION_TYPE.SUCCESS && (
         <Fragment>
-          {data.isEmpty ? (
+          {state.data.isEmpty ? (
             <Alert message="Список постів пустий" />
           ) : (
-            data.list.map((item) => (
+            state.data.list.map((item) => (
               <Fragment key={item.id}>
                 <PostItem {...item} />
               </Fragment>
